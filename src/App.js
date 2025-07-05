@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, Info, Play, RefreshCw } from 'lucide-react';
-import './App.css'; 
+import { CheckCircle, XCircle, Info, Play, RefreshCw, ChevronRight, ChevronDown, History } from 'lucide-react';
 
 const EarleyParserInterface = () => {
   const [sentence, setSentence] = useState('');
@@ -14,6 +13,8 @@ const EarleyParserInterface = () => {
   const [currentItemInput, setCurrentItemInput] = useState('');
   const [completedItems, setCompletedItems] = useState([]);
   const [itemFeedback, setItemFeedback] = useState('');
+  const [stepHistory, setStepHistory] = useState([]);
+  const [expandedSteps, setExpandedSteps] = useState({});
   
   // Dictionary và Grammar từ file PDF
   const dictionary = {
@@ -161,6 +162,26 @@ const EarleyParserInterface = () => {
         // Hoàn thành bước này
         setTimeout(() => {
           setItemFeedback('🎉 Hoàn thành bước I' + currentStep + '!');
+          
+          // Lưu vào history
+          const stepData = {
+            step: currentStep,
+            word: currentStep > 0 ? words[currentStep - 1] : 'Start',
+            items: [...completedItems, userItem],
+            completed: true
+          };
+          
+          setStepHistory(prev => {
+            const newHistory = [...prev];
+            const existingIndex = newHistory.findIndex(h => h.step === currentStep);
+            if (existingIndex >= 0) {
+              newHistory[existingIndex] = stepData;
+            } else {
+              newHistory.push(stepData);
+            }
+            return newHistory;
+          });
+          
           setTimeout(() => {
             if (currentStep < words.length) {
               // Chuyển sang bước tiếp theo
@@ -198,6 +219,25 @@ const EarleyParserInterface = () => {
       
       if (currentItemIndex + 1 >= expectedItems.length) {
         setTimeout(() => {
+          // Lưu vào history
+          const stepData = {
+            step: currentStep,
+            word: currentStep > 0 ? words[currentStep - 1] : 'Start',
+            items: [...completedItems, expectedItem],
+            completed: true
+          };
+          
+          setStepHistory(prev => {
+            const newHistory = [...prev];
+            const existingIndex = newHistory.findIndex(h => h.step === currentStep);
+            if (existingIndex >= 0) {
+              newHistory[existingIndex] = stepData;
+            } else {
+              newHistory.push(stepData);
+            }
+            return newHistory;
+          });
+          
           if (currentStep < words.length) {
             setCurrentStep(currentStep + 1);
             setCurrentItemIndex(0);
@@ -241,6 +281,19 @@ const EarleyParserInterface = () => {
     setCurrentItemInput('');
     setCompletedItems([]);
     setItemFeedback('');
+    setStepHistory([]);
+    setExpandedSteps({});
+  };
+
+  const truncateText = (text, maxLength = 10) => {
+    return text?.length > maxLength ? text.slice(0, maxLength) + '...' : text;
+  }
+  
+  const toggleStepExpansion = (stepNum) => {
+    setExpandedSteps(prev => ({
+      ...prev,
+      [stepNum]: !prev[stepNum]
+    }));
   };
 
   const words = sentence.trim().split(/\s+/);
@@ -250,216 +303,310 @@ const EarleyParserInterface = () => {
   const totalItemsInStep = expectedItems.length;
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-white">
-      <div className="bg-blue-50 p-4 rounded-lg mb-6">
-        <h1 className="text-2xl font-bold text-blue-900 mb-2">Earley Parser Interactive</h1>
-        <p className="text-blue-700">Thực hành thuật toán Earley parsing với kiểm tra tự động</p>
-      </div>
-
-      {/* Dictionary và Grammar */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <h3 className="font-semibold text-gray-800 mb-3">📚 Dictionary</h3>
-          <div className="text-sm space-y-1 max-h-40 overflow-y-auto">
-            {Object.entries(dictionary).map(([word, pos]) => (
-              <div key={word} className="flex">
-                <span className="font-mono w-16">{word}:</span>
-                <span className="text-blue-600">{pos.join(', ')}</span>
-              </div>
-            ))}
-          </div>
+    <div className="flex min-h-screen bg-gray-100">
+      {/* Sidebar - Lịch sử các bước */}
+      <div className="w-80 bg-white shadow-lg overflow-y-auto">
+        <div className="p-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+            <History size={20} />
+            Lịch sử các bước
+          </h2>
         </div>
-
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <h3 className="font-semibold text-gray-800 mb-3">📋 Grammar Rules</h3>
-          <div className="text-sm space-y-1 max-h-40 overflow-y-auto">
-            {grammar.map((rule, idx) => (
-              <div key={idx} className="font-mono text-green-700">{rule}</div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Input Section */}
-      <div className="bg-white border-2 border-gray-200 rounded-lg p-4 mb-6">
-        <h3 className="font-semibold text-gray-800 mb-3">🎯 Chọn câu để phân tích</h3>
-        <div className="flex flex-wrap gap-2 mb-3">
-          {sampleSentences.map((sample, idx) => (
-            <button
-              key={idx}
-              onClick={() => {
-                setSentence(sample);
-                resetParsing();
-              }}
-              className="px-3 py-1 bg-blue-100 text-blue-800 rounded hover:bg-blue-200 text-sm"
-            >
-              {sample}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={sentence}
-            onChange={(e) => setSentence(e.target.value)}
-            placeholder="Hoặc nhập câu khác..."
-            className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            onClick={resetParsing}
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2"
-          >
-            <Play size={16} />
-            Bắt đầu
-          </button>
-        </div>
-      </div>
-
-      {/* Parsing Section */}
-      {sentence && (
-        <div className="bg-white border-2 border-gray-200 rounded-lg p-4 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-800">
-              📊 Bước {currentStep}: I{currentStep}
-              {currentWord && ` (Từ: "${currentWord}")`}
-            </h3>
-            <button
-              onClick={resetParsing}
-              className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 flex items-center gap-1"
-            >
-              <RefreshCw size={14} />
-              Reset
-            </button>
-          </div>
-
-          {/* Progress */}
-          <div className="flex items-center mb-4">
-            {words.map((word, idx) => (
-              <div key={idx} className="flex items-center">
-                <div className={`px-2 py-1 rounded text-sm ${
-                  idx < currentStep ? 'bg-green-100 text-green-800' :
-                  idx === currentStep ? 'bg-blue-100 text-blue-800' :
-                  'bg-gray-100 text-gray-600'
-                }`}>
-                  {word}
-                </div>
-                {idx < words.length - 1 && (
-                  <div className="mx-2 text-gray-400">→</div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {!parsingComplete && (
-            <div>
-              <div className="mb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">
-                    Item {currentItemIndex + 1}/{totalItemsInStep}
-                  </span>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setShowHint(!showHint)}
-                      className="px-2 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-xs"
-                    >
-                      💡 Gợi ý
-                    </button>
-                    <button
-                      onClick={skipCurrentItem}
-                      className="px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 text-xs"
-                    >
-                      ⏭️ Skip
-                    </button>
+        
+        <div className="p-4">
+          {stepHistory.length === 0 ? (
+            <p className="text-gray-500 text-sm">Chưa có bước nào được hoàn thành</p>
+          ) : (
+            <div className="space-y-3">
+              {stepHistory.map((step, idx) => (
+                <div key={idx} className="border border-gray-200 rounded-lg">
+                  <div 
+                    className="p-3 bg-green-50 border-l-4 border-l-green-500 cursor-pointer hover:bg-green-100 transition-colors"
+                    onClick={() => toggleStepExpansion(step.step)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle size={16} className="text-green-600" />
+                        <span className="font-medium text-green-800">
+                          I{step.step}
+                        </span>
+                        {step.word !== 'Start' && (
+                          <span className="text-sm text-green-600">
+                            ("{step.word}")
+                          </span>
+                        )}
+                      </div>
+                      {expandedSteps[step.step] ? (
+                        <ChevronDown size={16} className="text-gray-400" />
+                      ) : (
+                        <ChevronRight size={16} className="text-gray-400" />
+                      )}
+                    </div>
                   </div>
+                  
+                  {expandedSteps[step.step] && (
+                    <div className="p-3 bg-gray-50">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">
+                        Items ({step.items.length}):
+                      </h4>
+                      <div className="space-y-1">
+                        {step.items.map((item, itemIdx) => (
+                          <div key={itemIdx} className="text-xs font-mono text-gray-600 bg-white p-1 rounded">
+                            {item}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                
-                <div className="bg-gray-50 p-2 rounded text-sm mb-2">
-                  <strong>Đã hoàn thành:</strong>
-                  {completedItems.length > 0 ? (
-                    <ul className="list-disc list-inside mt-1 text-green-700">
-                      {completedItems.map((item, idx) => (
-                        <li key={idx} className="font-mono">{item}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <span className="text-gray-500 ml-1">Chưa có</span>
+              ))}
+            </div>
+          )}
+          
+          {/* Bước hiện tại */}
+          {sentence && !parsingComplete && (
+            <div className="mt-4 border border-blue-200 rounded-lg">
+              <div className="p-3 bg-blue-50 border-l-4 border-l-blue-500">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-blue-500 rounded-full animate-pulse"></div>
+                  <span className="font-medium text-blue-800">
+                    I{currentStep} (Đang thực hiện)
+                  </span>
+                  {currentWord && (
+                    <span className="text-sm text-blue-600">
+                      ("{currentWord}")
+                    </span>
                   )}
                 </div>
               </div>
+              
+              <div className="p-3 bg-gray-50">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">
+                  Đã hoàn thành ({completedItems.length}/{totalItemsInStep}):
+                </h4>
+                <div className="space-y-1">
+                  {completedItems.map((item, idx) => (
+                    <div key={idx} className="text-xs font-mono text-gray-600 bg-white p-1 rounded">
+                      {item}
+                    </div>
+                  ))}
+                </div>
+                
+                {currentExpectedItem && (
+                  <div className="mt-2 pt-2 border-t border-gray-200">
+                    <div className="text-xs text-gray-500 mb-1">Tiếp theo:</div>
+                    <div className="text-xs font-mono text-blue-600 bg-blue-50 p-1 rounded">
+                      {truncateText(currentExpectedItem)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nhập item tiếp theo:
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={currentItemInput}
-                  onChange={(e) => setCurrentItemInput(e.target.value)}
-                  placeholder="Ví dụ: S -> .NP VP, 0 (hoặc S → .NP VP, 0)"
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-                  onKeyPress={(e) => e.key === 'Enter' && checkCurrentItem()}
-                />
+      {/* Main Content */}
+      <div className="flex-1 p-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="bg-blue-50 p-4 rounded-lg mb-6">
+            <h1 className="text-2xl font-bold text-blue-900 mb-2">Earley Parser Interactive</h1>
+            <p className="text-blue-700">Thực hành thuật toán Earley parsing với kiểm tra tự động</p>
+          </div>
+
+          {/* Dictionary và Grammar */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-semibold text-gray-800 mb-3">📚 Dictionary</h3>
+              <div className="text-sm space-y-1 max-h-40 overflow-y-auto">
+                {Object.entries(dictionary).map(([word, pos]) => (
+                  <div key={word} className="flex">
+                    <span className="font-mono w-16">{word}:</span>
+                    <span className="text-blue-600">{pos.join(', ')}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-semibold text-gray-800 mb-3">📋 Grammar Rules</h3>
+              <div className="text-sm space-y-1 max-h-40 overflow-y-auto">
+                {grammar.map((rule, idx) => (
+                  <div key={idx} className="font-mono text-green-700">{rule}</div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Input Section */}
+          <div className="bg-white border-2 border-gray-200 rounded-lg p-4 mb-6">
+            <h3 className="font-semibold text-gray-800 mb-3">🎯 Chọn câu để phân tích</h3>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {sampleSentences.map((sample, idx) => (
                 <button
-                  onClick={checkCurrentItem}
-                  disabled={!currentItemInput.trim()}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2"
+                  key={idx}
+                  onClick={() => {
+                    setSentence(sample);
+                    resetParsing();
+                  }}
+                  className="px-3 py-1 bg-blue-100 text-blue-800 rounded hover:bg-blue-200 text-sm"
                 >
-                  <CheckCircle size={16} />
-                  Kiểm tra
+                  {sample}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={sentence}
+                onChange={(e) => setSentence(e.target.value)}
+                placeholder="Hoặc nhập câu khác..."
+                className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={resetParsing}
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2"
+              >
+                <Play size={16} />
+                Bắt đầu
+              </button>
+            </div>
+          </div>
+
+          {/* Parsing Section */}
+          {sentence && (
+            <div className="bg-white border-2 border-gray-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-gray-800">
+                  📊 Bước {currentStep}: I{currentStep}
+                  {currentWord && ` (Từ: "${currentWord}")`}
+                </h3>
+                <button
+                  onClick={resetParsing}
+                  className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 flex items-center gap-1"
+                >
+                  <RefreshCw size={14} />
+                  Reset
                 </button>
               </div>
-            </div>
-          )}
 
-          {/* Item Feedback */}
-          {itemFeedback && (
-            <div className={`mt-4 p-3 rounded ${
-              itemFeedback.includes('✅') ? 'bg-green-100 text-green-800' : 
-              itemFeedback.includes('❌') ? 'bg-red-100 text-red-800' :
-              itemFeedback.includes('⏭️') ? 'bg-yellow-100 text-yellow-800' :
-              'bg-blue-100 text-blue-800'
-            }`}>
-              {itemFeedback}
-            </div>
-          )}
-
-          {/* General Feedback */}
-          {feedback && (
-            <div className={`mt-4 p-3 rounded ${
-              isCorrect ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-            }`}>
-              {feedback}
-            </div>
-          )}
-
-          {/* Hint */}
-          {showHint && (
-            <div className="mt-4 p-3 bg-yellow-50 text-yellow-800 rounded">
-              <div className="mb-2">
-                <strong>💡 Gợi ý chung:</strong> {getHint()}
+              {/* Progress */}
+              <div className="flex items-center mb-4">
+                {words.map((word, idx) => (
+                  <div key={idx} className="flex items-center">
+                    <div className={`px-2 py-1 rounded text-sm ${
+                      idx < currentStep ? 'bg-green-100 text-green-800' :
+                      idx === currentStep ? 'bg-blue-100 text-blue-800' :
+                      'bg-gray-100 text-gray-600'
+                    }`}>
+                      {word}
+                    </div>
+                    {idx < words.length - 1 && (
+                      <div className="mx-2 text-gray-400">→</div>
+                    )}
+                  </div>
+                ))}
               </div>
-              {currentExpectedItem && (
-                <div className="text-sm">
-                  <strong>🎯 Item hiện tại:</strong> 
-                  <span className="font-mono bg-yellow-200 px-1 rounded ml-1">
-                    {currentExpectedItem}
-                  </span>
+
+              {!parsingComplete && (
+                <div>
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700">
+                        Item {currentItemIndex + 1}/{totalItemsInStep}
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setShowHint(!showHint)}
+                          className="px-2 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-xs"
+                        >
+                          💡 Gợi ý
+                        </button>
+                        <button
+                          onClick={skipCurrentItem}
+                          className="px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 text-xs"
+                        >
+                          ⏭️ Skip
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nhập item tiếp theo:
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={currentItemInput}
+                      onChange={(e) => setCurrentItemInput(e.target.value)}
+                      placeholder="Ví dụ: S -> .NP VP, 0 (hoặc S → .NP VP, 0)"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                      onKeyPress={(e) => e.key === 'Enter' && checkCurrentItem()}
+                    />
+                    <button
+                      onClick={checkCurrentItem}
+                      disabled={!currentItemInput.trim()}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2"
+                    >
+                      <CheckCircle size={16} />
+                      Kiểm tra
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Item Feedback */}
+              {itemFeedback && (
+                <div className={`mt-4 p-3 rounded ${
+                  itemFeedback.includes('✅') ? 'bg-green-100 text-green-800' : 
+                  itemFeedback.includes('❌') ? 'bg-red-100 text-red-800' :
+                  itemFeedback.includes('⏭️') ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-blue-100 text-blue-800'
+                }`}>
+                  {itemFeedback}
+                </div>
+              )}
+
+              {/* General Feedback */}
+              {feedback && (
+                <div className={`mt-4 p-3 rounded ${
+                  isCorrect ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                }`}>
+                  {feedback}
+                </div>
+              )}
+
+              {/* Hint */}
+              {showHint && (
+                <div className="mt-4 p-3 bg-yellow-50 text-yellow-800 rounded">
+                  <div className="mb-2">
+                    <strong>💡 Gợi ý chung:</strong> {getHint()}
+                  </div>
+                  {currentExpectedItem && (
+                    <div className="text-sm">
+                      <strong>🎯 Item hiện tại:</strong> 
+                      <span className="font-mono bg-yellow-200 px-1 rounded ml-1">
+                        {currentExpectedItem}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           )}
-        </div>
-      )}
 
-      {/* Instructions */}
-      <div className="bg-blue-50 p-4 rounded-lg">
-        <h3 className="font-semibold text-blue-900 mb-2">📖 Hướng dẫn</h3>
-        <div className="text-sm text-blue-800 space-y-1">
-          <p>• <strong>Prediction:</strong> Thêm items mới khi gặp non-terminal sau dấu chấm</p>
-          <p>• <strong>Scanning:</strong> Di chuyển dấu chấm qua terminal khi khớp với input</p>
-          <p>• <strong>Completion:</strong> Hoàn thành rule và cập nhật items trước đó</p>
-          <p>• <strong>Format linh hoạt:</strong> Có thể dùng "-{'>'}" hoặc "→", khoảng cách tùy ý</p>
-          <p>• <strong>Ví dụ hợp lệ:</strong> "S → .NP VP, 0" hoặc "S -{'>'} .NP VP , 0"</p>
+          {/* Instructions */}
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <h3 className="font-semibold text-blue-900 mb-2">📖 Hướng dẫn</h3>
+            <div className="text-sm text-blue-800 space-y-1">
+              <p>• <strong>Prediction:</strong> Thêm items mới khi gặp non-terminal sau dấu chấm</p>
+              <p>• <strong>Scanning:</strong> Di chuyển dấu chấm qua terminal khi khớp với input</p>
+              <p>• <strong>Completion:</strong> Hoàn thành rule và cập nhật items trước đó</p>
+              <p>• <strong>Format linh hoạt:</strong> Có thể dùng "-{'>'}" hoặc "→", khoảng cách tùy ý</p>
+              <p>• <strong>Ví dụ hợp lệ:</strong> "S → .NP VP, 0" hoặc "S -{'>'} .NP VP , 0"</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
